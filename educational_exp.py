@@ -31,7 +31,7 @@ llm = ChatMistralAI(
 llm_with_tools = llm.bind_tools(tools)
 
 
-def ed_exp(resume_text:str):
+def edu_exp(resume_text:str):
     prompt = f"""Extract educational experiences from the resume text below according the tool:
 Resume:
 {resume_text}
