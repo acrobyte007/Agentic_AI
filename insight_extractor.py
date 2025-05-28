@@ -15,6 +15,7 @@ llm = ChatMistralAI(
 
 # Insight extractor function
 def extract_insights(summary_or_data: str):
+    print("in the extarctor function")
     prompt = f"""Extract concise resume insights from the following summary or structured resume data.
 Return the insights in the following format:
 {{
@@ -28,4 +29,5 @@ Input:
 {summary_or_data}
 """
     response = llm.invoke(prompt)
-    return response.content
+    print("response from the insight extractor")
+    return response.content ##string

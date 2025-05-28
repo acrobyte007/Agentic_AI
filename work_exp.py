@@ -32,10 +32,12 @@ llm_with_tools = llm.bind_tools(tools)
 
 
 def work_exp(resume_text:str):
+    print("Inside Work Experience function ")
     prompt = f"""Extract work experiences from the resume text below according the tool:
 Resume:
 {resume_text}
 """
     response=llm_with_tools.invoke(prompt).tool_calls
+    print("work experience response is gnerated")
     return response[0]['args']['work_experiences']
 

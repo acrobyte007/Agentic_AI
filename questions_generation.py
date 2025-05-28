@@ -11,7 +11,7 @@ llm = ChatMistralAI(
     api_key=api_key
 )
 
-def generate_questions(insights: list) -> list:
+def generate_questions(insights: str) -> str:
     prompt = f"""Based on the following resume insights, generate a list of tailored interview questions:
 Resume Insights:
 {insights}
@@ -19,4 +19,4 @@ Resume Insights:
 Return only the questions as a Python list of strings.
 """
     response = llm.invoke(prompt)
-    return eval(response.content)  
+    return response.content  

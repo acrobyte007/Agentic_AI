@@ -12,8 +12,8 @@ class EducationalExperience(BaseModel):
     Institution: str = Field(..., description="The name of the institution")
     Degree: str = Field(..., description="The degree obtained")
     Field: str = Field(..., description="The field of study")
-    Start_year: int = Field(..., description="The start year of the education")
-    End_year: Optional[int] = Field(default=None, description="The end year of the education (optional if ongoing)")
+    Start_year: int 
+    End_year: Optional[int]
 
 class EducationalExperienceList(BaseModel):
     """List of Educational Experience"""
@@ -32,9 +32,12 @@ llm_with_tools = llm.bind_tools(tools)
 
 
 def edu_exp(resume_text:str):
+    print("inside educational experience")
     prompt = f"""Extract educational experiences from the resume text below according the tool:
 Resume:
 {resume_text}
 """
     response=llm_with_tools.invoke(prompt).tool_calls
+    print("educational experience is called")
     return response[0]['args']['edu_experiences']
+
