@@ -9,6 +9,7 @@ api_key = os.getenv("MISTRAL_API_KEY")
 
 class WorkExperience(BaseModel):
     """Work Experience"""
+    print("work experinece tool is called")
     company: str =Field(description="Company name")
     role:  str = Field(description="Role name")
     start_date: Optional[str] = Field(default=None, description="work starting date Format: YYYY-MM")
@@ -31,7 +32,7 @@ llm = ChatMistralAI(
 llm_with_tools = llm.bind_tools(tools)
 
 
-def work_exp(resume_text:str):
+def work_experience(resume_text:str):
     print("Inside Work Experience function ")
     prompt = f"""Extract work experiences from the resume text below according the tool:
 Resume:
@@ -41,3 +42,13 @@ Resume:
     print("work experience response is gnerated")
     return response[0]['args']['work_experiences']
 
+
+if __name__ =="__main__":
+    resume_text = """John Doe
+Work Experience:
+- Software Engineer, TechCorp, 2020-2023: Developed web applications using Python and Django.
+- Data Scientist, DataInc, 2023-2025: Built machine learning models for predictive analytics.
+Education:
+- B.S. Computer Science, University of Example, 2016-2020
+"""
+    print(work_experience(resume_text))

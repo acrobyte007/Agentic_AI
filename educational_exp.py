@@ -9,6 +9,7 @@ api_key = os.getenv("MISTRAL_API_KEY")
 
 class EducationalExperience(BaseModel):
     """Educational Experience"""
+    print("Educational Experience tool is called")
     Institution: str = Field(..., description="The name of the institution")
     Degree: str = Field(..., description="The degree obtained")
     Field: str = Field(..., description="The field of study")
@@ -40,3 +41,12 @@ Resume:
     response=llm_with_tools.invoke(prompt).tool_calls
     return response[0]['args']['edu_experiences']
 
+if __name__ =="__main__":
+    resume_text = """John Doe
+Work Experience:
+- Software Engineer, TechCorp, 2020-2023: Developed web applications using Python and Django.
+- Data Scientist, DataInc, 2023-2025: Built machine learning models for predictive analytics.
+Education:
+- B.S. Computer Science, University of Example, 2016-2020
+"""
+    print(edu_exp(resume_text))

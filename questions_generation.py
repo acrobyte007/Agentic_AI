@@ -1,14 +1,14 @@
 import os
 from dotenv import load_dotenv
-from langchain_mistralai import ChatMistralAI
+from langchain_groq import ChatGroq
 
 load_dotenv()
-api_key = os.getenv("MISTRAL_API_KEY")
+api_key = os.getenv("GROQ_API_KEY")
 
-llm = ChatMistralAI(
-    model="mistral-large-latest",
-    temperature=0,
-    api_key=api_key
+groq_model = ChatGroq(
+    model_name="llama3-8b-8192",
+    groq_api_key=api_key,
+    max_retries=1
 )
 
 def generate_questions(insights: str) -> str:
@@ -19,5 +19,5 @@ Resume Insights:
 
 Return only the questions as a Python list of strings.
 """
-    response = llm.invoke(prompt)
+    response = groq_model.invoke(prompt)
     return response.content  
