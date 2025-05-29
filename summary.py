@@ -17,12 +17,13 @@ llm = ChatMistralAI(
 
 
 def summary_generator(Work:list,education:list):
-        print("inside summary generator function")
-        prompt = f"""Generate a summary of the following work experience and education:
+        print("inside summary generator")
+        
+        prompt = f"""Generate a summary of the following work experience and education in 200 words:
 Work experience: {Work}
 Education: {education}
 """
         response = llm.invoke(prompt)
-        print("Generating summary is called")
+        
         return response.content  ##string
 

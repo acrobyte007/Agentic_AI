@@ -12,6 +12,7 @@ llm = ChatMistralAI(
 )
 
 def generate_questions(insights: str) -> str:
+    print("inside questions generation")
     prompt = f"""Based on the following resume insights, generate a list of tailored interview questions:
 Resume Insights:
 {insights}
