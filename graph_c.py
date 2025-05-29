@@ -5,9 +5,10 @@ from insight_extractor import extract_insights
 from questions_generation import generate_questions
 from typing_extensions import Annotated, TypedDict
 from langgraph.graph.message import add_messages
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph,END
 from langchain_core.messages import AIMessage, HumanMessage
 import re
+from langgraph.checkpoint.memory import InMemorySaver
 
 class State(TypedDict):
     messages: Annotated[list, add_messages]
@@ -92,9 +93,9 @@ workflow.add_edge("work_exp", "edu_exp")
 workflow.add_edge("edu_exp", "summary")
 workflow.add_edge("summary", "insights")
 workflow.add_edge("insights", "questions")
-
 # Compile the graph
-graph = workflow.compile()
+checkpointer = InMemorySaver()
+graph = workflow.compile(checkpointer=checkpointer)
 
 if __name__ == "__main__":
     initial_state = {
@@ -112,7 +113,8 @@ if __name__ == "__main__":
     }
 
     # Invoke the graph
-    result = graph.invoke(initial_state)
+    config = {"configurable": {"thread_id": "1"}}
+    result = graph.invoke(initial_state,config)
     # Get the last message from the result
     last_message = result['messages'][-1].content
 
