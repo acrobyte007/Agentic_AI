@@ -25,7 +25,6 @@ State is managed in memory using a `CHECKPOINTS` dictionary, allowing efficient 
 acrobyte007/
 ├── .gitignore                   # Git ignore file for excluding files like __pycache__
 ├── .env                         # Environment file for API keys (e.g., MISTRAL_API_KEY)
-├── __pycache__/                 # Python cache directory (excluded from version control)
 ├── app.py                       # FastAPI application with endpoint definitions
 ├── graph_n.py                   # LangGraph workflow for resume processing
 ├── work_exp.py                  # Module for extracting work experience
@@ -67,10 +66,6 @@ acrobyte007/
      ```powershell
      .\venv\Scripts\Activate.ps1
      ```
-   - On Unix/Linux/Mac:
-     ```bash
-     source venv/bin/activate
-     ```
 
 3. **Install Dependencies**:
    ```bash
@@ -82,7 +77,7 @@ acrobyte007/
      ```bash
      echo "MISTRAL_API_KEY=your_api_key" > .env
      ```
-   - Replace `your_api_key` with your Mistral API key.
+   - Replace `api_key` with your Mistral API key.
 
 5. **Verify Setup**:
    - Ensure all files (`app.py`, `graph_n.py`, `work_exp.py`, `educational_exp.py`, `summary.py`, `insight_extractor.py`, `questions_generation.py`, `.env`) are in `F:\Resume_Reviewer_Agent\Agentic_AI`.
@@ -208,69 +203,6 @@ curl -X POST "http://localhost:8000/resume-question" -H "Content-Type: applicati
 
 4. **Caching**:
    - `summary.py` caches summaries to reduce Mistral API calls, improving performance.
-
-## Testing the API
-
-1. **Start the Server**:
-   ```bash
-   python app.py
-   ```
-
-2. **Test `/analyze-resume`**:
-   ```bash
-   curl -X POST "http://localhost:8000/analyze-resume" -H "Content-Type: application/json" -d '{"resume_text": "Software Engineer at TechCorp (2020-01 - Present): Developed web applications using Python and Django.\nData Analyst at DataInc (2018-06 - 2019-12): Analyzed large datasets with SQL.\nB.S. in Computer Science at State University (2014-2018)"}'
-   ```
-   - Copy the `Checkpoint ID` from the response (e.g., `123e4567-e89b-12d3-a456-426614174000`).
-
-3. **Test `/resume-question`**:
-   ```bash
-   curl -X POST "http://localhost:8000/resume-question" -H "Content-Type: application/json" -d '{"checkpoint_id": "123e4567-e89b-12d3-a456-426614174000"}'
-   ```
-   - Repeat to iterate through all 8 questions (per your logs).
-
-4. **Python Test Script**:
-   ```python
-   import httpx
-   import asyncio
-
-   async def test_analyze_resume():
-       async with httpx.AsyncClient() as client:
-           response = await client.post(
-               "http://localhost:8000/analyze-resume",
-               json={
-                   "resume_text": (
-                       "Software Engineer at TechCorp (2020-01 - Present): Developed web applications using Python and Django.\n"
-                       "Data Analyst at DataInc (2018-06 - 2019-12): Analyzed large datasets with SQL.\n"
-                       "B.S. in Computer Science at State University (2014-2018)"
-                   )
-               },
-               timeout=30.0
-           )
-           checkpoint_id = None
-           async for chunk in response.aiter_text():
-               print(f"Received chunk: {chunk}")
-               if chunk.startswith("Checkpoint ID:"):
-                   checkpoint_id = chunk.split(":", 1)[1].strip()
-           return checkpoint_id
-
-   async def test_resume_question(checkpoint_id: str, num_calls: int = 3):
-       async with httpx.AsyncClient() as client:
-           for i in range(num_calls):
-               print(f"\nRequest {i+1} for checkpoint_id: {checkpoint_id}")
-               response = await client.post(
-                   "http://localhost:8000/resume-question",
-                   json={"checkpoint_id": checkpoint_id},
-                   timeout=10.0
-               )
-               print(f"Response: {response.json()}")
-
-   async def main():
-       checkpoint_id = await test_analyze_resume()
-       if checkpoint_id:
-           await test_resume_question(checkpoint_id, num_calls=10)
-
-   asyncio.run(main())
-   ```
 
 ## Dependencies
 
