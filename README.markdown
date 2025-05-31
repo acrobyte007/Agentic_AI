@@ -75,7 +75,7 @@ acrobyte007/
 4. **Set Up Environment**:
    - Create a `.env` file in the project root:
      ```bash
-     echo "MISTRAL_API_KEY=your_api_key" > .env
+     echo "MISTRAL_API_KEY=api_key" > .env
      ```
    - Replace `api_key` with your Mistral API key.
 
@@ -229,16 +229,6 @@ curl -X POST "http://localhost:8000/resume-question" -H "Content-Type: applicati
 - **Invalid Checkpoint ID**: Returns a 404 error for `/resume-question`.
 - **No Questions**: Returns “No more questions available” when questions are exhausted.
 - **API Errors**: Logs Mistral API failures for debugging.
-
-## Production Considerations
-
-- **Persistent Storage**: Replace `CHECKPOINTS` with a database (e.g., Redis) for persistence.
-- **Authentication**: Add OAuth2/JWT to secure endpoints.
-- **Rate Limiting**: Prevent abuse with rate limits.
-- **Logging**: Enhance logging for monitoring (already implemented in `app.py`).
-- **Deployment**: Use Gunicorn with Uvicorn for production.
-- **Caching**: Monitor `summary.py` cache size (limited to 1000 entries).
-- **API Keys**: Secure `MISTRAL_API_KEY` in a vault for production.
 
 ## Example Usage
 
