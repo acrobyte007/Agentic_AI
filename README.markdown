@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **Acrobyte007** project is a FastAPI-based application designed to analyze resume text, generate a detailed summary, and produce tailored interview questions. It uses a LangGraph workflow to process resumes through nodes that extract work experience, education, generate summaries, derive insights, and create questions. The API provides two main endpoints:
+The Resume Analysis API project is a FastAPI-based application designed to analyze resume text, generate a detailed summary, and produce tailored interview questions. It uses a LangGraph workflow to process resumes through nodes that extract work experience, education, generate summaries, derive insights, and create questions. The API provides two main endpoints:
 
 - **POST `/analyze-resume`**: Processes a resume and streams the summary, first interview question, and a unique `checkpoint_id` as plain text, keeping the connection open.
 - **POST `/resume-question`**: Retrieves the next question for a given `checkpoint_id`, enabling pagination through questions without reprocessing the resume.
