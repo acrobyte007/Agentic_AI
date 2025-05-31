@@ -1,4 +1,4 @@
-# Acrobyte007 - Resume Analysis API
+# Resume Analysis API
 
 ## Overview
 
