@@ -1,10 +1,8 @@
 from pydantic import BaseModel, Field
 from typing import List,Optional
-from langchain_mistralai import ChatMistralAI
+from langchain_groq import ChatGroq
 from dotenv import load_dotenv
 import os
-load_dotenv()
-api_key = os.getenv("MISTRAL_API_KEY")
 
 
 class EducationalExperience(BaseModel):
@@ -23,14 +21,15 @@ class EducationalExperienceList(BaseModel):
 
 tools=[EducationalExperienceList]
 
-llm = ChatMistralAI(
-    model="mistral-large-latest",
-    temperature=0,
-    api_key=api_key
+load_dotenv()
+api_key = os.getenv("GROQ_API_KEY")
+
+groq_model = ChatGroq(
+    model_name="llama3-8b-8192",
+    groq_api_key=api_key,
+    max_retries=1
 )
-
-llm_with_tools = llm.bind_tools(tools)
-
+llm_with_tools = groq_model.bind_tools(tools)
 
 def edu_exp(resume_text:str):
     print("Extracting educational experiences...")

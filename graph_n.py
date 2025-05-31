@@ -4,17 +4,19 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import InMemorySaver
+from fastapi.responses import StreamingResponse
 import re
 import json
+import asyncio
 
-# Simulated imports (replace with actual implementations)
+
 from work_exp import work_experience
 from educational_exp import edu_exp
 from summary import summary_generator
 from insight_extractor import extract_insights
 from questions_generation import generate_questions
 
-# Global dictionary to store checkpoints
+
 CHECKPOINTS = {}
 
 class State(TypedDict):
@@ -23,8 +25,7 @@ class State(TypedDict):
     education: Annotated[list, add_messages]
     resume_text: Annotated[list, add_messages]
 
-# Define the graph nodes
-def work_exp_generator(state: State):
+async def work_exp_generator(state: State):
     work_data = work_experience(state['resume_text'][-1].content)
     work_str = "\n".join(
         f"{job['role']} at {job['company']} ({job['start_date']} - {job['end_date']}): {job['description']}"
@@ -35,7 +36,7 @@ def work_exp_generator(state: State):
     print(f"Messages: {work_str}")
     return {"Work": [AIMessage(content=work_str)], "messages": [AIMessage(content=work_str)]}
 
-def edu_exp_generator(state: State):
+async def edu_exp_generator(state: State):
     resume_text = state['resume_text'][-1].content
     cleaned_text = "\n".join(line for line in resume_text.splitlines() if not line.strip().startswith('#'))
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text.strip())
@@ -60,20 +61,23 @@ def edu_exp_generator(state: State):
     print(f"Messages: {education_str}")
     return {"education": [AIMessage(content=education_str)], "messages": [AIMessage(content=education_str)]}
 
-def makes_summary(state: State):
-    summary = summary_generator(state['Work'][-1].content, state['education'][-1].content)
+async def makes_summary(state: State):
+    summary_chunks = []
+    async for chunk in summary_generator(state['Work'][-1].content, state['education'][-1].content):
+        summary_chunks.append(chunk)
+    summary = "".join(summary_chunks)
     print(f"[makes_summary] Summary data type: {type(summary)}")
     print(f"\n[makes_summary] Output:")
     print(f"Messages: {summary}")
     return {"messages": [AIMessage(content=summary)]}
 
-def insight_extractor(state: State):
+async def insight_extractor(state: State):
     insights = extract_insights(state['messages'][-1].content)
     print(f"\n[insight_extractor] Output:")
     print(f"Messages: {insights}")
     return {"messages": [AIMessage(content=insights)]}
 
-def questions_generator(state: State):
+async def questions_generator(state: State):
     questions = generate_questions(state['messages'][-1].content)
     if isinstance(questions, list):
         questions = "\n".join(questions)
@@ -81,7 +85,7 @@ def questions_generator(state: State):
     print(f"Messages: {questions}")
     return {"messages": [AIMessage(content=questions)]}
 
-# Workflow setup
+
 workflow = StateGraph(State)
 workflow.add_node("work_exp", work_exp_generator)
 workflow.add_node("edu_exp", edu_exp_generator)
@@ -96,14 +100,14 @@ workflow.add_edge("summary", "insights")
 workflow.add_edge("insights", "questions")
 workflow.add_edge("questions", END)
 
-# Compile the graph with in-memory checkpointer
+
 checkpointer = InMemorySaver()
 graph = workflow.compile(checkpointer=checkpointer)
 
-def analyze_resume(resume_text: str) -> dict:
+async def analyze_resume(resume_text: str) -> StreamingResponse:
     """
-    Analyzes resume text, generates summary and questions, and stores state.
-    Returns checkpoint ID, summary, and first question.
+    Analyzes resume text, streams summary as chunks, and streams the first question.
+    Returns a StreamingResponse for FastAPI.
     """
     initial_state = {
         "resume_text": [HumanMessage(content=resume_text)],
@@ -111,57 +115,47 @@ def analyze_resume(resume_text: str) -> dict:
         "Work": [],
         "education": []
     }
-
     checkpoint_id = str(uuid4())
+    print(checkpoint_id)
     config = {"configurable": {"thread_id": checkpoint_id}}
 
-    result = graph.invoke(initial_state, config)
+    async def stream_content():
+        result = await graph.ainvoke(initial_state, config)
 
-    # Extract summary (from insights node, second-to-last message)
-    insights_str = result['messages'][-2].content
-    try:
-        # Parse insights JSON if it's a string
-        insights_data = json.loads(insights_str) if isinstance(insights_str, str) else insights_str
-        if isinstance(insights_data, dict) and "insights" in insights_data:
-            # Combine insights into a human-readable summary
-            summary = " ".join(insights_data["insights"])
-        else:
-            summary = str(insights_str)  # Fallback if not a JSON object
-    except json.JSONDecodeError:
-        summary = insights_str  # Fallback to raw insights if parsing fails
+        
+        summary = result['messages'][-3].content
+        yield "Summary: "
+        for i in range(0, len(summary), 50):  
+            yield summary[i:i+50]
+            await asyncio.sleep(0.1)
 
-    # Extract questions (from questions node, last message)
-    questions_str = result['messages'][-1].content
-    questions_list = []
-    if questions_str:
-        # Remove preamble like "Here are the tailored interview questions based on the resume insights:"
-        cleaned_questions = re.sub(
-            r'^Here\s+are\s+the\s+tailored\s+interview\s+questions\s+based\s+on\s+the\s+resume\s+insights:\s*\n*\[\n',
-            '',
-            questions_str,
-            flags=re.DOTALL | re.IGNORECASE
-        ).rstrip(']\n')
-        # Split and clean questions
-        questions_list = [
-            q.strip().strip('",') for q in cleaned_questions.split('\n') 
-            if q.strip() and q.strip('",') and not q.strip().startswith('[')
-        ]
+       
+        questions_str = result['messages'][-1].content
+        questions_list = []
+        if questions_str:
+            cleaned_questions = re.sub(
+                r'^Here\s+are\s+the\s+tailored\s+interview\s+questions\s+based\s+on\s+the\s+resume\s+insights:\s*\n*\[\n',
+                '',
+                questions_str,
+                flags=re.DOTALL | re.IGNORECASE
+            ).rstrip(']\n')
+            questions_list = [
+                q.strip().strip('",') for q in cleaned_questions.split('\n')
+                if q.strip() and q.strip('",') and not q.strip().startswith('[')
+            ]
 
-    # Store state in CHECKPOINTS
-    CHECKPOINTS[checkpoint_id] = {
-        "summary": summary,
-        "questions": questions_list,
-        "current_question_index": 0
-    }
+       
+        if questions_list:
+            yield f"\nFirst interview question: {questions_list[0]}"
 
-    # Return first question or indicate no questions
-    first_question = questions_list[0] if questions_list else "No questions generated."
-    
-    return {
-        "checkpoint_id": checkpoint_id,
-        "summary": summary,
-        "question": first_question
-    }
+        
+        CHECKPOINTS[checkpoint_id] = {
+            "summary": summary,
+            "questions": questions_list,
+            "current_question_index": 0
+        }
+
+    return StreamingResponse(stream_content(), media_type="text/plain")
 
 def get_next_question(checkpoint_id: str) -> dict:
     """
@@ -183,3 +177,56 @@ def get_next_question(checkpoint_id: str) -> dict:
     return {
         "question": questions[next_index]
     }
+
+if __name__ == "__main__":
+    async def test_workflow():
+        """
+        Test the workflow with a sample resume by running the stream_content generator.
+        """
+        sample_resume = """
+        Software Engineer at TechCorp (2020-01 - Present): Developed web applications using Python.
+        B.S. in Computer Science at State University (2014-2018)
+        """
+        print("Testing analyze_resume with sample resume...")
+        initial_state = {
+            "resume_text": [HumanMessage(content=sample_resume)],
+            "messages": [],
+            "Work": [],
+            "education": []
+        }
+        checkpoint_id = str(uuid4())
+        config = {"configurable": {"thread_id": checkpoint_id}}
+        
+        # Run the workflow and stream content directly
+        result = await graph.ainvoke(initial_state, config)
+        async def stream_content():
+            summary = result['messages'][-3].content
+            yield "Summary: "
+            for i in range(0, len(summary), 50):
+                yield summary[i:i+50]
+                await asyncio.sleep(0.1)
+            questions_str = result['messages'][-1].content
+            questions_list = []
+            if questions_str:
+                cleaned_questions = re.sub(
+                    r'^Here\s+are\s+the\s+tailored\s+interview\s+questions\s+based\s+on\s+the\s+resume\s+insights:\s*\n*\[\n',
+                    '',
+                    questions_str,
+                    flags=re.DOTALL | re.IGNORECASE
+                ).rstrip(']\n')
+                questions_list = [
+                    q.strip().strip('",') for q in cleaned_questions.split('\n')
+                    if q.strip() and q.strip('",') and not q.strip().startswith('[')
+                ]
+            if questions_list:
+                yield f"\nFirst interview question: {questions_list[0]}"
+            CHECKPOINTS[checkpoint_id] = {
+                "summary": summary,
+                "questions": questions_list,
+                "current_question_index": 0
+            }
+        
+        async for chunk in stream_content():
+            print(f"Chunk: {chunk}")
+        
+    asyncio.run(test_workflow())
