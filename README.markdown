@@ -7,7 +7,7 @@ The **Acrobyte007** project is a FastAPI-based application designed to analyze r
 - **POST `/analyze-resume`**: Processes a resume and streams the summary, first interview question, and a unique `checkpoint_id` as plain text, keeping the connection open.
 - **POST `/resume-question`**: Retrieves the next question for a given `checkpoint_id`, enabling pagination through questions without reprocessing the resume.
 
-State is managed in memory using a `CHECKPOINTS` dictionary, allowing efficient question pagination. The application leverages caching for summaries and integrates with external APIs (e.g., Mistral) for processing. Interactive API documentation is available via Swagger UI.
+State is managed in memory using a `CHECKPOINTS` dictionary, allowing efficient question pagination. The application leverages caching for summaries and integrates with external APIs ( Mistral and Groq) for processing. Interactive API documentation is available via Swagger UI.
 
 ## Features
 
