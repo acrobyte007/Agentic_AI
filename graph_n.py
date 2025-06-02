@@ -5,9 +5,9 @@ from langgraph.graph import StateGraph, END
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.memory import InMemorySaver
 from fastapi.responses import StreamingResponse
-import re
 import asyncio
 import logging
+import re
 
 # Imports for external functions
 from work_exp import work_experience
@@ -32,10 +32,10 @@ class State(TypedDict):
 async def work_exp_generator(state: State):
     work_data = work_experience(state['resume_text'][-1].content)
     work_str = "\n".join(
-        f"{job['role']} at {job['company']} ({job['start_date']} - {job['end_date']}): {job['description']}"
+        f"{job['role']} at {job.get('company', 'Unknown')} ({job.get('start_date', 'Unknown')} - {job.get('end_date', 'Unknown')}): {job.get('description', '')}"
         for job in work_data
-    )
-    logger.info(f"\n[work_exp_generator] Output: {work_str}")
+    ) or "No work experience extracted"
+    logger.info(f"[work_exp_generator] Output: {work_str}")
     return {"Work": [AIMessage(content=work_str)], "messages": [AIMessage(content=work_str)]}
 
 async def edu_exp_generator(state: State):
@@ -58,7 +58,7 @@ async def edu_exp_generator(state: State):
     else:
         education_str = str(education_data) if education_data else "No education data extracted"
     
-    logger.info(f"\n[edu_exp_generator] Output: {education_str}")
+    logger.info(f"[edu_exp_generator] Output: {education_str}")
     return {"education": [AIMessage(content=education_str)], "messages": [AIMessage(content=education_str)]}
 
 async def makes_summary(state: State):
@@ -67,20 +67,20 @@ async def makes_summary(state: State):
         summary_chunks.append(chunk)
     summary = "".join(summary_chunks)
     logger.info(f"[makes_summary] Summary data type: {type(summary)}")
-    logger.info(f"\n[makes_summary] Output: {summary}")
+    logger.info(f"[makes_summary] Output: {summary}")
     return {"messages": [AIMessage(content=summary)]}
 
 async def insight_extractor(state: State):
     insights = extract_insights(state['messages'][-1].content)
-    logger.info(f"\n[insight_extractor] Output: {insights}")
-    return {"messages": [AIMessage(content=insights)]}
+    insights_str = "\n".join(insights) if insights else "No insights extracted"
+    logger.info(f"[insight_extractor] Output: {insights_str}")
+    return {"messages": [AIMessage(content=insights_str)]}
 
 async def questions_generator(state: State):
     questions = generate_questions(state['messages'][-1].content)
-    if isinstance(questions, list):
-        questions = "\n".join(questions)
-    logger.info(f"\n[questions_generator] Output: {questions}")
-    return {"messages": [AIMessage(content=questions)]}
+    questions_str = "\n".join(questions) if questions else "No questions generated"
+    logger.info(f"[questions_generator] Output: {questions_str}")
+    return {"messages": [AIMessage(content=questions_str)]}
 
 # Workflow setup
 workflow = StateGraph(State)
@@ -113,33 +113,22 @@ async def analyze_resume(resume_text: str) -> StreamingResponse:
 
     async def stream_content():
         result = await graph.ainvoke(initial_state, config)
-        summary = result['messages'][-3].content
+        summary = result['messages'][-3].content  # Summary from makes_summary
         yield "Summary: "
         for i in range(0, len(summary), 50):
             yield summary[i:i+50]
             await asyncio.sleep(0.1)
-        questions_str = result['messages'][-1].content
-        questions_list = []
-        if questions_str:
-            cleaned_questions = re.sub(
-                r'^Here\s+are\s+the\s+tailored\s+interview\s+questions\s+based\s+on\s+the\s+resume\s+insights:\s*\n*\[\n',
-                '',
-                questions_str,
-                flags=re.DOTALL | re.IGNORECASE
-            ).rstrip(']\n')
-            questions_list = [
-                q.strip().strip('",') for q in cleaned_questions.split('\n')
-                if q.strip() and q.strip('",') and not q.strip().startswith('[')
-            ]
-        if questions_list:
-            yield f"\nFirst interview question: {questions_list[0]}"
+        questions = result['messages'][-1].content.split("\n") if result['messages'][-1].content else []
+        if questions and questions[0]:
+            yield f"\nFirst interview question: {questions[0]}"
         CHECKPOINTS[checkpoint_id] = {
             "summary": summary,
-            "questions": questions_list,
+            "questions": questions,
             "current_question_index": 0
         }
-    headers={"check_point_id": checkpoint_id}
-    return StreamingResponse(stream_content(), media_type="text/plain",headers=headers)
+    
+    headers = {"check_point_id": checkpoint_id}
+    return StreamingResponse(stream_content(), media_type="text/plain", headers=headers)
 
 def get_next_question(checkpoint_id: str) -> dict:
     if checkpoint_id not in CHECKPOINTS:
@@ -160,44 +149,8 @@ if __name__ == "__main__":
         B.S. in Computer Science at State University (2014-2018)
         """
         logger.info("Testing analyze_resume with sample resume...")
-        initial_state = {
-            "resume_text": [HumanMessage(content=sample_resume)],
-            "messages": [],
-            "Work": [],
-            "education": []
-        }
-        checkpoint_id = str(uuid4())
-        config = {"configurable": {"thread_id": checkpoint_id}}
-        
-        async def stream_content():
-            result = await graph.ainvoke(initial_state, config)
-            summary = result['messages'][-3].content
-            yield "Summary: "
-            for i in range(0, len(summary), 50):
-                yield summary[i:i+50]
-                await asyncio.sleep(0.1)
-            questions_str = result['messages'][-1].content
-            questions_list = []
-            if questions_str:
-                cleaned_questions = re.sub(
-                    r'^Here\s+are\s+the\s+tailored\s+interview\s+questions\s+based\s+on\s+the\s+resume\s+insights:\s*\n*\[\n',
-                    '',
-                    questions_str,
-                    flags=re.DOTALL | re.IGNORECASE
-                ).rstrip(']\n')
-                questions_list = [
-                    q.strip().strip('",') for q in cleaned_questions.split('\n')
-                    if q.strip() and q.strip('",') and not q.strip().startswith('[')
-                ]
-            if questions_list:
-                yield f"\nFirst interview question: {questions_list[0]}"
-            CHECKPOINTS[checkpoint_id] = {
-                "summary": summary,
-                "questions": questions_list,
-                "current_question_index": 0
-            }
-        
-        async for chunk in stream_content():
+        response = await analyze_resume(sample_resume)
+        async for chunk in response.body_iterator:
             logger.info(f"Chunk: {chunk}")
-        
+    
     asyncio.run(test_workflow())
