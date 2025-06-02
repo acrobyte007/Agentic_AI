@@ -8,10 +8,10 @@ import os
 class EducationalExperience(BaseModel):
     """Educational Experience"""
     print("Educational Experience tool is called")
-    Institution: str = Field(..., description="The name of the institution")
-    Degree: str = Field(..., description="The degree obtained")
-    Field: str = Field(..., description="The field of study")
-    Start_year: int 
+    Institution: Optional[str] = Field(..., description="The name of the institution")
+    Degree: Optional[str] = Field(..., description="The degree obtained")
+    Field: Optional[str] = Field(..., description="The field of study")
+    Start_year: Optional[int] 
     End_year: Optional[int]
 
 class EducationalExperienceList(BaseModel):

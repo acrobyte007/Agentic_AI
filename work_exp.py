@@ -10,11 +10,11 @@ api_key = os.getenv("MISTRAL_API_KEY")
 class WorkExperience(BaseModel):
     """Work Experience"""
     print("work experinece tool is called")
-    company: str =Field(description="Company name")
-    role:  str = Field(description="Role name")
+    company: Optional[str] =Field(description="Company name")
+    role:  Optional[str] = Field(description="Role name")
     start_date: Optional[str] = Field(default=None, description="work starting date Format: YYYY-MM")
     end_date: Optional[str] = Field(default=None, description="Work ending date Format: YYYY-MM or 'Present'")
-    description: str =Field(description="Description of the work experience")
+    description: Optional[str] =Field(description="Description of the work experience")
 
 class WorkExperienceList(BaseModel):
     """List of work experiences"""
