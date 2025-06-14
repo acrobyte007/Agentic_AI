@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 import asyncio
 import logging
 import re
+import json
 
 # Imports for external functions
 from work_exp import work_experience
@@ -28,6 +29,7 @@ class State(TypedDict):
     Work: Annotated[list, add_messages]
     education: Annotated[list, add_messages]
     resume_text: Annotated[list, add_messages]
+    raw_education: list
 
 async def work_exp_generator(state: State):
     work_data = work_experience(state['resume_text'][-1].content)
@@ -47,19 +49,20 @@ async def edu_exp_generator(state: State):
     logger.info(f"[edu_exp_generator] Education data type: {type(education_data)}")
     logger.info(f"[edu_exp_generator] Raw education data: {education_data}")
     
-    if isinstance(education_data, list):
-        education_str = "\n".join(
-            f"{edu.get('Degree', 'Unknown Degree')} in {edu.get('Field', 'Unknown Field')} "
-            f"at {edu.get('Institution', 'Unknown Institution')} "
-            f"({edu.get('Start_year', 'Unknown')} - {edu.get('End_year', 'Unknown')})"
-            for edu in education_data
-            if edu.get('Degree') and edu.get('Institution') and edu.get('Field')
-        ) or "No valid education entries found"
-    else:
-        education_str = str(education_data) if education_data else "No education data extracted"
+    state_education = education_data if isinstance(education_data, list) else []
+    education_str = "\n".join(
+        f"{edu.get('Degree', 'Unknown Degree')} in {edu.get('Field', 'Unknown Field')} "
+        f"at {edu.get('Institution', 'Unknown Institution')} "
+        f"({edu.get('Start_year', 'Unknown')} - {edu.get('End_year', 'Unknown')})"
+        for edu in education_data
+    ) or "No education entries found"
     
     logger.info(f"[edu_exp_generator] Output: {education_str}")
-    return {"education": [AIMessage(content=education_str)], "messages": [AIMessage(content=education_str)]}
+    return {
+        "education": [AIMessage(content=education_str)],
+        "messages": [AIMessage(content=education_str)],
+        "raw_education": state_education
+    }
 
 async def makes_summary(state: State):
     summary_chunks = []
@@ -105,7 +108,8 @@ async def analyze_resume(resume_text: str) -> StreamingResponse:
         "resume_text": [HumanMessage(content=resume_text)],
         "messages": [],
         "Work": [],
-        "education": []
+        "education": [],
+        "raw_education": []
     }
     checkpoint_id = str(uuid4())
     logger.info(f"Generated checkpoint_id: {checkpoint_id}")
@@ -113,44 +117,31 @@ async def analyze_resume(resume_text: str) -> StreamingResponse:
 
     async def stream_content():
         result = await graph.ainvoke(initial_state, config)
-        summary = result['messages'][-3].content  # Summary from makes_summary
-        yield "Summary: "
-        for i in range(0, len(summary), 50):
-            yield summary[i:i+50]
-            await asyncio.sleep(0.1)
+        summary = result['messages'][-3].content
         questions = result['messages'][-1].content.split("\n") if result['messages'][-1].content else []
-        if questions and questions[0]:
-            yield f"\nFirst interview question: {questions[0]}"
+        work = result['Work'][-1].content.split("\n") if result['Work'] else []
+        education = result.get('raw_education', [])
+        
+        response = {
+            "summary": summary,
+            "work": [
+                {
+                    "role": line.split(" at ")[0].strip(),
+                    "company": line.split(" at ")[1].split(" (")[0].strip() if " at " in line else "Unknown",
+                    "dates": line.split("(")[1].split(")")[0] if "(" in line else "Unknown",
+                    "description": line.split(": ")[1].strip() if ": " in line else ""
+                } for line in work if line
+            ],
+            "education": education,
+            "first_question": questions[0] if questions else None,
+            "checkpoint_id": checkpoint_id
+        }
+        yield json.dumps(response)
+        
         CHECKPOINTS[checkpoint_id] = {
             "summary": summary,
             "questions": questions,
             "current_question_index": 0
         }
     
-    headers = {"check_point_id": checkpoint_id}
-    return StreamingResponse(stream_content(), media_type="text/plain", headers=headers)
-
-def get_next_question(checkpoint_id: str) -> dict:
-    if checkpoint_id not in CHECKPOINTS:
-        return {"error": "Invalid checkpoint ID"}
-    state = CHECKPOINTS[checkpoint_id]
-    current_index = state["current_question_index"]
-    questions = state["questions"]
-    next_index = current_index + 1
-    CHECKPOINTS[checkpoint_id]["current_question_index"] = next_index
-    if next_index >= len(questions):
-        return {"message": "No more questions available"}
-    return {"question": questions[next_index]}
-
-if __name__ == "__main__":
-    async def test_workflow():
-        sample_resume = """
-        Software Engineer at TechCorp (2020-01 - Present): Developed web applications using Python.
-        B.S. in Computer Science at State University (2014-2018)
-        """
-        logger.info("Testing analyze_resume with sample resume...")
-        response = await analyze_resume(sample_resume)
-        async for chunk in response.body_iterator:
-            logger.info(f"Chunk: {chunk}")
-    
-    asyncio.run(test_workflow())
+    return StreamingResponse(stream_content(), media_type="application/json")
