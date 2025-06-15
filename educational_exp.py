@@ -5,52 +5,37 @@ from dotenv import load_dotenv
 import os
 import logging
 
-load_dotenv()
-api_key = os.getenv("GROQ_API_KEY")
-
 # Logging setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    raise ValueError("GROQ_API_KEY not set")
+
 class EducationalExperience(BaseModel):
-    """Educational Experience"""
-    Institution: Optional[str] = None
-    Degree: Optional[str] = None
-    Field: Optional[str] = None
-    Start_year: Optional[int] = None
-    End_year: Optional[int] = None
+    Institution: Optional[str]
+    Degree: Optional[str]
+    Field: Optional[str]
+    Start_year: Optional[int]
+    End_year: Optional[int]
 
 class EducationalExperienceList(BaseModel):
-    """List of Educational Experiences"""
     edu_experiences: List[EducationalExperience]
 
-groq_model = ChatGroq(
-    model_name="llama3-8b-8192",
-    groq_api_key=api_key,
-    max_retries=3
-).with_structured_output(EducationalExperienceList)
+groq_model = ChatGroq(model_name="llama3-8b-8192", groq_api_key=api_key).with_structured_output(EducationalExperienceList)
 
 def edu_exp(resume_text: str) -> List[dict]:
     """Extract educational experiences from resume text."""
-    logger.info("Extracting educational experiences...")
+    if not resume_text.strip():
+        logger.warning("Empty resume text provided")
+        return []
+    
     prompt = f"""
-Extract educational experiences from the following resume text and return them in a structured format with fields: Institution, Degree, Field, Start_year, End_year.
-
-Resume:
+Extract educational experiences from this resume, returning Institution, Degree, Field, Start_year, End_year for each:
 {resume_text}
-
-Return a list of educational experiences in the format:
-{{
-  "edu_experiences": [
-    {{
-      "Institution": str,
-      "Degree": str,
-      "Field": str,
-      "Start_year": int,
-      "End_year": int
-    }}
-  ]
-}}
 """
     try:
         result = groq_model.invoke(prompt)
@@ -58,3 +43,12 @@ Return a list of educational experiences in the format:
     except Exception as e:
         logger.error(f"Error extracting educational experiences: {str(e)}")
         return []
+
+if __name__ == "__main__":
+    sample_resume = """
+    Education:
+    - University of XYZ, Bachelor of Science in Computer Science, 2018-2022
+    - ABC Community College, Associate Degree in Mathematics, 2016-2018
+    """
+    experiences = edu_exp(sample_resume)
+    print(experiences)

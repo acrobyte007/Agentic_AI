@@ -21,13 +21,9 @@ class WorkExperienceList(BaseModel):
     """List of Work Experiences"""
     work_experiences: List[WorkExperience]
 
-# Load environment variables
 load_dotenv()
 api_key = os.getenv("MISTRAL_API_KEY")
-if not api_key:
-    raise ValueError("MISTRAL_API_KEY not set")
 
-# Initialize Mistral model with structured output
 llm = ChatMistralAI(
     model="mistral-large-latest",
     temperature=0,
@@ -36,18 +32,13 @@ llm = ChatMistralAI(
 
 def work_experience(resume_text: str) -> List[dict]:
     """Extract work experiences from resume text."""
-    logger.info("Extracting work experiences...")
     prompt = f"""Extract work experiences from the resume text below. Include company, role, start date (YYYY-MM), end date (YYYY-MM or 'Present'), and description for each experience.
 
 Resume:
 {resume_text}
 """
-    try:
-        result = llm.invoke(prompt)
-        return [exp.model_dump(exclude_none=True) for exp in result.work_experiences]
-    except Exception as e:
-        logger.error(f"Error extracting work experiences: {str(e)}")
-        return []
+    result = llm.invoke(prompt)
+    return [exp.model_dump(exclude_none=True) for exp in result.work_experiences]
 
 if __name__ == "__main__":
     resume_text = """John Doe
@@ -58,5 +49,4 @@ Education:
 - B.S. Computer Science, University of Example, 2016-2020
 """
     result = work_experience(resume_text)
-    logger.info(f"Extracted work experiences: {result}")
     print(result)
