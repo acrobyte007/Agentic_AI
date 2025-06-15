@@ -4,8 +4,7 @@
 
 The Resume Analysis API project is a FastAPI-based application designed to analyze resume text, generate a detailed summary, and produce tailored interview questions. It uses a LangGraph workflow to process resumes through nodes that extract work experience, education, generate summaries, derive insights, and create questions. The API provides two main endpoints:
 
-- **POST `/analyze-resume`**: Processes a resume and streams the summary, first interview question, and a unique `checkpoint_id` as plain text, keeping the connection open.
-- **POST `/resume-question`**: Retrieves the next question for a given `checkpoint_id`, enabling pagination through questions without reprocessing the resume.
+- **POST `/analyze-resume`**: Processes a resume and streams the summary, interview questions
 
 State is managed in memory using a `CHECKPOINTS` dictionary, allowing efficient question pagination. The application leverages caching for summaries and integrates with external APIs ( Mistral and Groq) for processing. Interactive API documentation is available via Swagger UI.
 
@@ -30,7 +29,6 @@ acrobyte007/
 ├── work_exp.py                  # Module for extracting work experience
 ├── educational_exp.py           # Module for extracting education details
 ├── summary.py                   # Module for generating and caching resume summaries
-├── insight_extractor.py         # Module for extracting insights from summaries
 ├── questions_generation.py      # Module for generating interview questions
 └── README.md                    # Project documentation
 ```
@@ -141,42 +139,6 @@ First interview question: Can you walk me through a project where you optimized 
 - `200 OK`: Successful streaming response.
 - `500 Internal Server Error`: Error processing the resume (e.g., invalid input or API failure).
 
-### 2. POST `/resume-question`
-
-**Description**: Retrieves the next interview question for a given `checkpoint_id`.
-
-**Request Body**:
-```json
-{
-  "checkpoint_id": "string"
-}
-```
-
-**Example Request**:
-```bash
-curl -X POST "http://localhost:8000/resume-question" -H "Content-Type: application/json" -d '{"checkpoint_id": "123e4567-e89b-12d3-a456-426614174000"}'
-```
-
-**Response** (JSON):
-```json
-{
-  "question": "How do you approach data analysis, and what tools do you use to extract insights and create reports?",
-  "message": null
-}
-```
-
-**Response (no more questions)**:
-```json
-{
-  "question": null,
-  "message": "No more questions available"
-}
-```
-
-**Status Codes**:
-- `200 OK`: Successful response with the next question or a message.
-- `404 Not Found`: Invalid `checkpoint_id`.
-- `500 Internal Server Error`: Unexpected server error.
 
 ## How It Works
 
@@ -191,18 +153,11 @@ curl -X POST "http://localhost:8000/resume-question" -H "Content-Type: applicati
    - The summary and first question are streamed, with the `checkpoint_id` included.
    - State (summary, questions, question index) is stored in `CHECKPOINTS`.
 
-2. **Question Pagination** (`/resume-question`):
-   - Retrieves the state from `CHECKPOINTS` using the `checkpoint_id`.
-   - Increments the question index and returns the next question.
-   - Returns “No more questions available” when exhausted.
-   - Uses in-memory state, avoiding workflow re-execution.
 
-3. **State Management**:
+2. **State Management**:
    - `CHECKPOINTS` in `graph_n.py` stores state in memory, keyed by `checkpoint_id`.
    - `InMemorySaver` from LangGraph ensures workflow consistency.
 
-4. **Caching**:
-   - `summary.py` caches summaries to reduce Mistral API calls, improving performance.
 
 ## Dependencies
 
